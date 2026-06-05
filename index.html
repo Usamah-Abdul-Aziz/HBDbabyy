@@ -850,6 +850,7 @@ const CFG = {
   birthMonth : 5,          // 0-indexed. Juni = 5
   birthDay   : 4,
   birthYear  : 2004,
+  unlockYear : 2026,
 
   // ✏️ Ganti dengan URL MP3 kamu
   // GitHub raw: 'https://raw.githubusercontent.com/user/repo/main/song.mp3'
@@ -858,19 +859,33 @@ const CFG = {
   songTitle  : 'Lagu Untukmu 🎵',
 };
 
+const MONTHS_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+
+function getUnlockDate() {
+  return new Date(CFG.unlockYear, CFG.birthMonth, CFG.birthDay, 0,0,0,0);
+}
+
+function formatUnlockDate() {
+  return `${CFG.birthDay} ${MONTHS_ID[CFG.birthMonth]} ${CFG.unlockYear}`;
+}
+
 /* ============================================================
-   UTILITY: cek hari ini apakah ulang tahun
+   UTILITY: cek status tanggal
 ============================================================ */
+function isUnlocked() {
+  return new Date() >= getUnlockDate();
+}
+
 function isBirthday() {
   const n = new Date();
-  return n.getMonth() === CFG.birthMonth && n.getDate() === CFG.birthDay;
+  return isUnlocked() && n.getMonth() === CFG.birthMonth && n.getDate() === CFG.birthDay;
 }
 
 function daysUntil() {
-  const now  = new Date();
-  let next   = new Date(now.getFullYear(), CFG.birthMonth, CFG.birthDay, 0,0,0,0);
-  if (now >= next) next = new Date(now.getFullYear()+1, CFG.birthMonth, CFG.birthDay, 0,0,0,0);
-  return Math.ceil((next - now) / 86400000);
+  const now    = new Date();
+  const unlock = getUnlockDate();
+  if (now >= unlock) return 0;
+  return Math.ceil((unlock - now) / 86400000);
 }
 
 /* ============================================================
@@ -904,7 +919,6 @@ const LOCKS = {
    INJECT LOCK OVERLAYS (jika bukan hari ulang tahun)
 ============================================================ */
 function buildLockHTML(sectionId) {
-  const d     = daysUntil();
   const cfg   = LOCKS[sectionId];
   return `
     <div class="lock-overlay" id="lock-${sectionId}">
@@ -930,7 +944,7 @@ function buildLockHTML(sectionId) {
             <span class="lock-timer-lbl">Detik</span>
           </div>
         </div>
-        <span class="lock-date-badge">🗓 Terbuka 4 Juni 2026</span>
+        <span class="lock-date-badge">🗓 Terbuka ${formatUnlockDate()}</span>
       </div>
     </div>
   `;
@@ -949,11 +963,10 @@ function applyLocks() {
    LOCK TIMER UPDATE
 ============================================================ */
 function updateLockTimers() {
-  const now  = new Date();
-  let next   = new Date(now.getFullYear(), CFG.birthMonth, CFG.birthDay, 0,0,0,0);
-  if (now >= next) next = new Date(now.getFullYear()+1, CFG.birthMonth, CFG.birthDay, 0,0,0,0);
-
-  const diff    = next - now;
+  const now     = new Date();
+  const unlock  = getUnlockDate();
+  const diff    = unlock - now;
+  if (diff <= 0) return;
   const days    = Math.floor(diff / 86400000);
   const hours   = Math.floor((diff % 86400000) / 3600000);
   const minutes = Math.floor((diff % 3600000)  / 60000);
@@ -1108,9 +1121,11 @@ window.addEventListener('load', () => {
   if (isBirthday()) {
     runBirthdayMode();
   } else {
-    applyLocks();
-    setInterval(updateLockTimers, 1000);
-    updateLockTimers();
+    if (!isUnlocked()) {
+      applyLocks();
+      setInterval(updateLockTimers, 1000);
+      updateLockTimers();
+    }
   }
 });
 
@@ -1168,12 +1183,21 @@ tsParticles.load("tsparticles", {
    COUNTDOWN (hero)
 ============================================================ */
 function tick() {
-  if (isBirthday()) return;
-  const now  = new Date();
-  let next   = new Date(now.getFullYear(), CFG.birthMonth, CFG.birthDay, 0,0,0,0);
-  if (now >= next) next = new Date(now.getFullYear()+1, CFG.birthMonth, CFG.birthDay, 0,0,0,0);
+  const now = new Date();
+  let next;
+
+  if (!isUnlocked()) {
+    next = getUnlockDate();
+  } else {
+    if (isBirthday()) return;
+    document.getElementById('cd-label').textContent = '💝 Hadiahmu sudah terbuka';
+    document.getElementById('countdown').innerHTML =
+      '<div class="bday-badge">✨ Semua hadiah sudah terbuka ✨</div>';
+    return;
+  }
 
   const diff    = next - now;
+  if (diff <= 0) return;
   const days    = Math.floor(diff / 86400000);
   const hours   = Math.floor((diff % 86400000) / 3600000);
   const minutes = Math.floor((diff % 3600000)  / 60000);
